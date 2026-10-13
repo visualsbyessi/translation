@@ -4,7 +4,7 @@
 The pipeline:
 1. Extracts the English audio from a source ad video.
 2. Transcribes narration into timed segments.
-3. Samples B-roll frames and detects visual scene boundaries.
+3. Optionally samples B-roll frames and detects visual scene boundaries.
 4. Uses OpenAI to translate/adapt each segment to fit the original timing.
 5. Generates voiceover segments with ElevenLabs.
 6. Regenerates shortened versions when translated speech is too long.
@@ -111,6 +111,58 @@ def transcribe_audio(client: OpenAI, audio_path: Path, model: str) -> list[Segme
         if text:
             segments.append(Segment(index=idx, start=start, end=end, text=text))
     return segments
+
+
+def merge_segments(segments: list[Segment], max_duration_sec: float, max_chars: int, max_gap_sec: float) -> list[Segment]:
+    if not segments:
+        return []
+
+    merged: list[Segment] = []
+    current = Segment(index=1, start=segments[0].start, end=segments[0].end, text=segments[0].text)
+
+    for segment in segments[1:]:
+        combined_text = f"{current.text} {segment.text}".strip()
+        combined_duration = segment.end - current.start
+        gap = segment.start - current.end
+        if combined_duration <= max_duration_sec and len(combined_text) <= max_chars and gap <= max_gap_sec:
+            current.end = segment.end
+            current.text = combined_text
+        else:
+            merged.append(current)
+            current = Segment(index=len(merged) + 1, start=segment.start, end=segment.end, text=segment.text)
+
+    merged.append(current)
+    for idx, segment in enumerate(merged, start=1):
+        segment.index = idx
+    return merged
+
+
+def apply_approved_script_to_timing(segments: list[Segment], approved_script: str) -> list[Segment]:
+    clean_script = " ".join(approved_script.split())
+    if not clean_script or not segments:
+        return segments
+
+    total_chars = sum(max(1, len(segment.text)) for segment in segments)
+    cursor = 0
+    scripted_segments: list[Segment] = []
+
+    for idx, segment in enumerate(segments, start=1):
+        if idx == len(segments):
+            chunk = clean_script[cursor:].strip()
+        else:
+            share = max(1, round(len(segment.text) / total_chars * len(clean_script)))
+            split_at = min(len(clean_script), cursor + share)
+            next_space = clean_script.find(" ", split_at)
+            if next_space != -1 and next_space - split_at < 40:
+                split_at = next_space
+            chunk = clean_script[cursor:split_at].strip()
+            cursor = split_at
+        if chunk:
+            scripted_segments.append(Segment(index=idx, start=segment.start, end=segment.end, text=chunk))
+
+    for idx, segment in enumerate(scripted_segments, start=1):
+        segment.index = idx
+    return scripted_segments or segments
 
 
 def elevenlabs_voices(api_key: str) -> list[dict[str, Any]]:
@@ -277,15 +329,23 @@ def detect_scene_changes(video_path: Path, threshold: float = 32.0, min_gap_sec:
     return changes
 
 
-def analyze_broll(client: OpenAI, video_path: Path, model: str) -> dict[str, Any]:
-    frames = sample_frames(video_path)
+def analyze_broll(client: OpenAI, video_path: Path, model: str, max_frames: int) -> dict[str, Any]:
+    if max_frames <= 0:
+        return {
+            "overall_visual_story": "B-roll analysis skipped to reduce cost and runtime.",
+            "shots": [],
+            "translation_notes": "Use narration timing only.",
+            "detected_scene_changes": detect_scene_changes(video_path),
+        }
+
+    frames = sample_frames(video_path, max_frames=max_frames)
     scene_changes = detect_scene_changes(video_path)
     content: list[dict[str, Any]] = [
         {
             "type": "input_text",
             "text": (
                 "Describe the B-roll in this ad video. Return compact JSON with: "
-                "overall_visual_story, shots [{timestamp, description, product_or_action, mood}], "
+                "overall_visual_story, shots [{timestamp as seconds number, description, product_or_action, mood}], "
                 "and translation_notes for syncing narration to visuals."
             ),
         }
@@ -343,6 +403,8 @@ def translate_segments(
     language_name: str,
     model: str,
     max_chars_per_second: float,
+    banned_terms: list[str],
+    using_approved_script: bool,
 ) -> list[dict[str, Any]]:
     payload = []
     for segment in segments:
@@ -354,6 +416,8 @@ def translate_segments(
         "task": "Translate English ad narration into natural target-language voiceover while fitting each original segment duration.",
         "rules": [
             "Keep meaning and sales intent.",
+            "The provided source text is the approved script. Use it as the source of truth.",
+            "Do not restore competitor product names from the original ad transcript.",
             "Adapt phrasing to sound native, not literal.",
             f"Write like a native {language_name} speaker recording a paid social ad.",
             "Prefer short natural phrases over word-for-word translation.",
@@ -364,6 +428,8 @@ def translate_segments(
             "Do not cram too many words into short visual moments.",
             "Return valid JSON only.",
         ],
+        "approved_script_mode": using_approved_script,
+        "banned_terms": banned_terms,
         "broll_analysis": broll,
         "segments": payload,
         "return_schema": {
@@ -455,6 +521,7 @@ def generate_timed_voice_segments(
     work_dir: Path,
     max_attempts: int,
     timing_pad_ms: int,
+    regenerate_long_segments: bool,
 ) -> list[dict[str, Any]]:
     generated: list[dict[str, Any]] = []
     for segment in translated_segments:
@@ -465,7 +532,7 @@ def generate_timed_voice_segments(
         for attempt in range(1, max_attempts + 1):
             elevenlabs_tts(text, voice_id, elevenlabs_key, final_path)
             actual_ms = audio_duration_ms(final_path)
-            if actual_ms <= target_ms or attempt == max_attempts:
+            if actual_ms <= target_ms or attempt == max_attempts or not regenerate_long_segments:
                 break
             text = shorten_translation(client, text, language_name, target_ms, text_model)
             time.sleep(0.4)
@@ -476,10 +543,14 @@ def generate_timed_voice_segments(
 
 def assemble_synced_audio(generated: list[dict[str, Any]], video_duration_ms: int) -> AudioSegment:
     bed = AudioSegment.silent(duration=video_duration_ms)
-    for segment in generated:
+    ordered = sorted(generated, key=lambda item: float(item["start"]))
+    for index, segment in enumerate(ordered):
         audio = AudioSegment.from_file(segment["audio_path"])
         start_ms = int(float(segment["start"]) * 1000)
-        available_ms = max(250, int((float(segment["end"]) - float(segment["start"])) * 1000))
+        segment_end_ms = int(float(segment["end"]) * 1000)
+        next_start_ms = int(float(ordered[index + 1]["start"]) * 1000) if index + 1 < len(ordered) else video_duration_ms
+        hard_end_ms = min(segment_end_ms, max(start_ms + 250, next_start_ms - 80))
+        available_ms = max(250, hard_end_ms - start_ms)
         if len(audio) > available_ms:
             speed = min(1.06, len(audio) / available_ms)
             audio = audio._spawn(audio.raw_data, overrides={"frame_rate": int(audio.frame_rate * speed)}).set_frame_rate(audio.frame_rate)
@@ -533,12 +604,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"))
     parser.add_argument("--work-dir", type=Path, default=Path("work"))
     parser.add_argument("--transcription-model", default=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"))
-    parser.add_argument("--text-model", default=os.getenv("OPENAI_TEXT_MODEL", "gpt-5.1"))
-    parser.add_argument("--vision-model", default=os.getenv("OPENAI_VISION_MODEL", "gpt-5.1"))
-    parser.add_argument("--max-attempts", type=int, default=3)
+    parser.add_argument("--text-model", default=os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini"))
+    parser.add_argument("--vision-model", default=os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini"))
+    parser.add_argument("--max-attempts", type=int, default=int(os.getenv("MAX_TTS_ATTEMPTS", "1")))
     parser.add_argument("--timing-pad-ms", type=int, default=150)
     parser.add_argument("--max-chars-per-second", type=float, default=13.0)
     parser.add_argument("--output-format", choices=["mp3", "wav"], default="mp3")
+    parser.add_argument("--broll-frames", type=int, default=int(os.getenv("BROLL_FRAMES", "0")), help="0 skips vision analysis for lower cost.")
+    parser.add_argument("--merge-segment-seconds", type=float, default=float(os.getenv("MERGE_SEGMENT_SECONDS", "14")))
+    parser.add_argument("--merge-segment-chars", type=int, default=int(os.getenv("MERGE_SEGMENT_CHARS", "280")))
+    parser.add_argument("--script-file", type=Path)
+    parser.add_argument("--banned-terms", default="")
+    parser.add_argument("--regenerate-long-segments", action="store_true", help="Regenerate long TTS segments. Slower and uses more ElevenLabs/OpenAI.")
     parser.add_argument("--write-debug-files", action="store_true", help="Also export JSON/SRT files for troubleshooting.")
     return parser.parse_args()
 
@@ -563,7 +640,12 @@ def main() -> None:
     source_audio = args.work_dir / "source_english.wav"
     extract_audio(args.video, source_audio)
     segments = transcribe_audio(client, source_audio, args.transcription_model)
-    broll = analyze_broll(client, args.video, args.vision_model)
+    segments = merge_segments(segments, args.merge_segment_seconds, args.merge_segment_chars, max_gap_sec=1.2)
+    approved_script = args.script_file.read_text(encoding="utf-8").strip() if args.script_file and args.script_file.exists() else ""
+    using_approved_script = bool(approved_script)
+    if using_approved_script:
+        segments = apply_approved_script_to_timing(segments, approved_script)
+    broll = analyze_broll(client, args.video, args.vision_model, args.broll_frames)
     voice_style = analyze_voice_style(client, segments, broll, args.text_model)
     available_voices = elevenlabs_voices(elevenlabs_key)
 
@@ -597,6 +679,8 @@ def main() -> None:
             language["name"],
             args.text_model,
             args.max_chars_per_second,
+            [term.strip() for term in args.banned_terms.split(",") if term.strip()],
+            using_approved_script,
         )
         generated = generate_timed_voice_segments(
             client,
@@ -608,6 +692,7 @@ def main() -> None:
             args.work_dir,
             args.max_attempts,
             args.timing_pad_ms,
+            args.regenerate_long_segments,
         )
 
         stem = f"{language_code}_{language['name'].lower()}"

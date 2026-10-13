@@ -6,5 +6,21 @@
   "fr": {
     "name": "French",
     "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_FR"
+  },
+  "es": {
+    "name": "Spanish",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_ES"
+  },
+  "it": {
+    "name": "Italian",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_IT"
+  },
+  "pt": {
+    "name": "Portuguese",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_PT"
+  },
+  "nl": {
+    "name": "Dutch",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_NL"
   }
 }

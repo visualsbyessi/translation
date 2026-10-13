@@ -9,6 +9,7 @@ const resultBox = document.querySelector("#result");
 const fileList = document.querySelector("#file-list");
 const downloadLink = document.querySelector("#download-link");
 const serverStatus = document.querySelector("#server-status");
+const languagesInput = document.querySelector("#languages");
 
 let pollTimer = null;
 
@@ -63,6 +64,14 @@ form.addEventListener("submit", async (event) => {
   resultBox.hidden = true;
   form.querySelector("button").disabled = true;
   setProgress("Queued", "Uploading video...");
+
+  const selectedLanguages = [...form.querySelectorAll('input[name="language_choice"]:checked')].map((input) => input.value);
+  languagesInput.value = selectedLanguages.join(" ");
+  if (selectedLanguages.length === 0) {
+    setProgress("Failed", "Choose at least one language.");
+    form.querySelector("button").disabled = false;
+    return;
+  }
 
   const formData = new FormData(form);
   const response = await fetch("/api/jobs", {

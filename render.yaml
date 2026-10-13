@@ -9,3 +9,13 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
+      - key: OPENAI_TRANSCRIPTION_MODEL
+        value: whisper-1
+      - key: OPENAI_TEXT_MODEL
+        value: gpt-4o-mini
+      - key: OPENAI_VISION_MODEL
+        value: gpt-4o-mini
+      - key: BROLL_FRAMES
+        value: "0"
+      - key: MAX_TTS_ATTEMPTS
+        value: "1"

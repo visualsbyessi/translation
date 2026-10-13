@@ -27,15 +27,24 @@
 
           <fieldset class="language-grid">
             <legend>Voiceover languages</legend>
-            <label>
-              <input type="checkbox" name="german" checked />
-              <span>German MP3</span>
-            </label>
-            <label>
-              <input type="checkbox" name="french" checked />
-              <span>French MP3</span>
-            </label>
+            <label><input type="checkbox" name="language_choice" value="de" checked /><span>German MP3</span></label>
+            <label><input type="checkbox" name="language_choice" value="fr" /><span>French MP3</span></label>
+            <label><input type="checkbox" name="language_choice" value="es" /><span>Spanish MP3</span></label>
+            <label><input type="checkbox" name="language_choice" value="it" /><span>Italian MP3</span></label>
+            <label><input type="checkbox" name="language_choice" value="pt" /><span>Portuguese MP3</span></label>
+            <label><input type="checkbox" name="language_choice" value="nl" /><span>Dutch MP3</span></label>
+            <input type="hidden" name="languages" id="languages" value="de" />
           </fieldset>
+
+          <label class="script-box">
+            <span>Approved script</span>
+            <textarea name="approved_script" rows="8" placeholder="Paste your clean script here. Use your client's product name and remove competitor claims or product names. The automation will adapt this to fit the original timing."></textarea>
+          </label>
+
+          <label class="script-box">
+            <span>Words or product names to avoid</span>
+            <input type="text" name="banned_terms" placeholder="Competitor brand, old product name, words to remove" />
+          </label>
 
           <button class="primary" type="submit">Generate voiceovers</button>
         </form>
@@ -58,7 +67,8 @@
 
       <aside class="notes">
         <h2>For editors</h2>
-        <p>Use the downloaded MP3 files in your video editor and place them on the original ad timeline.</p>
+        <p>Paste the approved client script to prevent competitor names from appearing in the generated voiceover.</p>
+        <p>Use language codes like de, fr, es, it, pt, or nl. The downloaded MP3 files go into your video editor on the original ad timeline.</p>
         <p>This tool creates voiceover audio only. Product clip replacement and overlay removal still happen manually.</p>
       </aside>
     </main>

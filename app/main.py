@@ -62,7 +62,7 @@ def zip_outputs(job_id: str) -> Path:
     return zip_path
 
 
-def run_voiceover_job(job_id: str, video_path: Path, languages: list[str]) -> None:
+def run_voiceover_job(job_id: str, video_path: Path, languages: list[str], script_path: Path | None, banned_terms: str) -> None:
     work_dir = job_dir(job_id) / "work"
     outputs_dir = job_dir(job_id) / "outputs"
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -83,6 +83,10 @@ def run_voiceover_job(job_id: str, video_path: Path, languages: list[str]) -> No
         "--output-format",
         "mp3",
     ]
+    if script_path:
+        command.extend(["--script-file", str(script_path)])
+    if banned_terms.strip():
+        command.extend(["--banned-terms", banned_terms.strip()])
 
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     log_path = job_dir(job_id) / "job.log"
@@ -124,15 +128,12 @@ def home() -> str:
 async def create_job(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
-    german: bool = Form(False),
-    french: bool = Form(False),
+    languages: str = Form("de"),
+    approved_script: str = Form(""),
+    banned_terms: str = Form(""),
 ) -> JSONResponse:
-    languages = []
-    if german:
-        languages.append("de")
-    if french:
-        languages.append("fr")
-    if not languages:
+    selected_languages = [item.strip().lower() for item in languages.replace(",", " ").split() if item.strip()]
+    if not selected_languages:
         raise HTTPException(status_code=400, detail="Choose at least one language.")
 
     job_id = uuid.uuid4().hex
@@ -145,6 +146,11 @@ async def create_job(
     with video_path.open("wb") as target:
         shutil.copyfileobj(video.file, target)
 
+    script_path = None
+    if approved_script.strip():
+        script_path = uploads_dir / "approved_script.txt"
+        script_path.write_text(approved_script.strip(), encoding="utf-8")
+
     write_status(
         job_id,
         {
@@ -152,11 +158,13 @@ async def create_job(
             "state": "queued",
             "message": "Upload received. Waiting to start...",
             "created_at": now_iso(),
-            "languages": languages,
+            "languages": selected_languages,
             "source_filename": video.filename,
+            "has_approved_script": bool(script_path),
+            "banned_terms": banned_terms,
         },
     )
-    background_tasks.add_task(run_voiceover_job, job_id, video_path, languages)
+    background_tasks.add_task(run_voiceover_job, job_id, video_path, selected_languages, script_path, banned_terms)
     return JSONResponse({"job_id": job_id, "status_url": f"/api/jobs/{job_id}"})
 
 

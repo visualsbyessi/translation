@@ -30,10 +30,12 @@ This is the easiest workflow for your team.
 
 1. You open the website.
 2. Upload the English ad video.
-3. Choose German, French, or both.
-4. Click `Generate voiceovers`.
-5. Wait for processing.
-6. Download the ZIP file with MP3 voiceovers.
+3. Enter language codes such as `de`, `fr`, or `es`.
+4. Paste the approved client script if you have one.
+5. Add competitor names or product names to avoid.
+6. Click `Generate voiceovers`.
+7. Wait for processing.
+8. Download the ZIP file with MP3 voiceovers.
 
 ## GitHub Actions Workflow
 
@@ -55,7 +57,7 @@ ad.mp4
 1. Takes the English ad video.
 2. Extracts the English voice audio.
 3. Transcribes the English narration.
-4. Looks at frames from the video to understand the B-roll.
+4. Uses narration timing by default, with optional B-roll frame analysis if you enable it.
 5. Translates the narration into German and/or French.
 6. Generates voiceover using ElevenLabs.
 7. Checks if each voiceover line fits the original timing.
@@ -63,6 +65,28 @@ ad.mp4
 9. Exports final synchronized MP3 voiceovers.
 
 The translation prompt is tuned for native-speaker German/French ad voiceover, not direct word-for-word translation.
+
+By default, the website uses a faster/cheaper mode:
+
+- skips B-roll vision analysis
+- merges short transcript pieces into fewer voiceover chunks
+- uses cheaper OpenAI text settings
+- avoids repeated regeneration unless you enable it
+
+This is better for 3-5 minute videos.
+
+The approved script box is recommended when localizing competitor ads. It prevents the automation from repeating the competitor product name from the original video transcript.
+
+Supported default language codes:
+
+```text
+de = German
+fr = French
+es = Spanish
+it = Italian
+pt = Portuguese
+nl = Dutch
+```
 
 ## Files In This Repository
 
