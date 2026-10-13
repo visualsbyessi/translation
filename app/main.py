@@ -86,14 +86,17 @@ def run_voiceover_job(job_id: str, video_path: Path, languages: list[str]) -> No
 
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
     log_path = job_dir(job_id) / "job.log"
-    log_path.write_text((result.stdout or "") + "\n" + (result.stderr or ""), encoding="utf-8")
+    job_log = (result.stdout or "") + "\n" + (result.stderr or "")
+    log_path.write_text(job_log, encoding="utf-8")
 
     if result.returncode != 0:
+        error_tail = "\n".join(job_log.strip().splitlines()[-12:])
+        print(f"Voiceover job {job_id} failed:\n{error_tail}", flush=True)
         write_status(
             job_id,
             {
                 "state": "failed",
-                "message": "The voiceover job failed. Check that the API keys, voice IDs, and video file are valid.",
+                "message": error_tail or "The voiceover job failed. Check that the API keys and video file are valid.",
             },
         )
         return
