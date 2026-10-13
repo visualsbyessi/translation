@@ -1,0 +1,10 @@
+{
+  "de": {
+    "name": "German",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_DE"
+  },
+  "fr": {
+    "name": "French",
+    "elevenlabs_voice_id_env": "ELEVENLABS_VOICE_ID_FR"
+  }
+}

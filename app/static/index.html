@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ad Voiceover Automation</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">Team voiceover tool</p>
+            <h1>Upload an English ad. Download translated MP3 voiceovers.</h1>
+          </div>
+          <span class="status-pill" id="server-status">Ready</span>
+        </div>
+
+        <form id="upload-form" class="uploader">
+          <label class="dropzone" for="video">
+            <input id="video" name="video" type="file" accept="video/*" required />
+            <span class="drop-icon">↑</span>
+            <strong id="file-label">Choose video file</strong>
+            <small>MP4, MOV, or other common ad video formats</small>
+          </label>
+
+          <fieldset class="language-grid">
+            <legend>Voiceover languages</legend>
+            <label>
+              <input type="checkbox" name="german" checked />
+              <span>German MP3</span>
+            </label>
+            <label>
+              <input type="checkbox" name="french" checked />
+              <span>French MP3</span>
+            </label>
+          </fieldset>
+
+          <button class="primary" type="submit">Generate voiceovers</button>
+        </form>
+
+        <section class="progress" id="progress" hidden>
+          <div class="progress-row">
+            <strong id="progress-title">Processing</strong>
+            <span id="progress-state">Queued</span>
+          </div>
+          <div class="bar"><span id="bar-fill"></span></div>
+          <p id="progress-message">Upload received.</p>
+        </section>
+
+        <section class="result" id="result" hidden>
+          <h2>MP3 files are ready</h2>
+          <ul id="file-list"></ul>
+          <a class="download" id="download-link" href="#">Download voiceovers</a>
+        </section>
+      </section>
+
+      <aside class="notes">
+        <h2>For editors</h2>
+        <p>Use the downloaded MP3 files in your video editor and place them on the original ad timeline.</p>
+        <p>This tool creates voiceover audio only. Product clip replacement and overlay removal still happen manually.</p>
+      </aside>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
