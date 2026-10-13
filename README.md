@@ -97,7 +97,7 @@ Use this when you want the browser upload page.
 - A place to host the backend app, such as Render, Railway, Fly.io, a VPS, or a computer that stays on.
 - Your OpenAI API key.
 - Your ElevenLabs API key.
-- Your ElevenLabs German and French voice IDs.
+- Optional: fixed ElevenLabs German and French voice IDs.
 
 ### Run The Website On Your Computer
 
@@ -121,6 +121,13 @@ Before using it, the computer or host must have these environment variables:
 ```text
 OPENAI_API_KEY=your_openai_key
 ELEVENLABS_API_KEY=your_elevenlabs_key
+```
+
+The app can automatically choose voices from your ElevenLabs account by matching the original ad's voice style. It matches the style and casting direction; it does not clone or impersonate a real person.
+
+If you want to force specific voices instead of auto-selecting, also set:
+
+```text
 ELEVENLABS_VOICE_ID_DE=your_german_voice_id
 ELEVENLABS_VOICE_ID_FR=your_french_voice_id
 ```
@@ -151,8 +158,6 @@ When deploying, add these environment variables in the host dashboard:
 ```text
 OPENAI_API_KEY
 ELEVENLABS_API_KEY
-ELEVENLABS_VOICE_ID_DE
-ELEVENLABS_VOICE_ID_FR
 ```
 
 After deployment, your editors use the website URL instead of touching GitHub Actions.
@@ -191,8 +196,8 @@ Add these secrets:
 |---|---|
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `ELEVENLABS_API_KEY` | Your ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID_DE` | The ElevenLabs voice ID for German |
-| `ELEVENLABS_VOICE_ID_FR` | The ElevenLabs voice ID for French |
+| `ELEVENLABS_VOICE_ID_DE` | Optional fixed ElevenLabs voice ID for German |
+| `ELEVENLABS_VOICE_ID_FR` | Optional fixed ElevenLabs voice ID for French |
 
 Your editors do **not** need to see these keys. GitHub keeps them hidden.
 

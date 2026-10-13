@@ -113,6 +113,111 @@ def transcribe_audio(client: OpenAI, audio_path: Path, model: str) -> list[Segme
     return segments
 
 
+def elevenlabs_voices(api_key: str) -> list[dict[str, Any]]:
+    response = requests.get(
+        "https://api.elevenlabs.io/v1/voices",
+        headers={"xi-api-key": api_key},
+        timeout=60,
+    )
+    if response.status_code >= 400:
+        raise RuntimeError(f"ElevenLabs voices error {response.status_code}: {response.text}")
+    return response.json().get("voices", [])
+
+
+def analyze_voice_style(client: OpenAI, segments: list[Segment], broll: dict[str, Any], model: str) -> dict[str, Any]:
+    sample_text = " ".join(segment.text for segment in segments[:8])
+    prompt = {
+        "task": "Infer the original English ad voiceover style from narration and B-roll context. Do not identify or clone a real person. Return JSON only.",
+        "narration_sample": sample_text,
+        "broll_context": broll.get("overall_visual_story", ""),
+        "return_schema": {
+            "gender_presentation": "male|female|neutral|unknown",
+            "age_impression": "young_adult|adult|mature|unknown",
+            "energy": "calm|warm|confident|energetic|urgent|luxury|friendly",
+            "pace": "slow|medium|fast",
+            "tone": "short description",
+            "voice_direction": "short casting direction for a native speaker voice actor",
+        },
+    }
+    response = client.responses.create(
+        model=model,
+        input=[{"role": "user", "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}]}],
+        text={"format": {"type": "json_object"}},
+    )
+    return json.loads(response.output_text)
+
+
+def voice_matches_language(voice: dict[str, Any], language_code: str, language_name: str) -> bool:
+    labels = voice.get("labels") or {}
+    searchable = " ".join(
+        str(value).lower()
+        for value in [
+            voice.get("name", ""),
+            voice.get("description", ""),
+            labels.get("language", ""),
+            labels.get("accent", ""),
+            labels.get("use_case", ""),
+        ]
+    )
+    language_terms = {
+        "de": ["german", "deutsch"],
+        "fr": ["french", "francais", "français"],
+    }.get(language_code, [language_code.lower(), language_name.lower()])
+    return any(term in searchable for term in language_terms)
+
+
+def choose_elevenlabs_voice(
+    client: OpenAI,
+    voices: list[dict[str, Any]],
+    language_code: str,
+    language_name: str,
+    voice_style: dict[str, Any],
+    model: str,
+) -> str:
+    candidates = [voice for voice in voices if voice_matches_language(voice, language_code, language_name)]
+    if not candidates:
+        candidates = voices
+    if not candidates:
+        raise RuntimeError("No ElevenLabs voices found in this account.")
+
+    compact_candidates = []
+    for voice in candidates[:40]:
+        compact_candidates.append(
+            {
+                "voice_id": voice.get("voice_id"),
+                "name": voice.get("name"),
+                "description": voice.get("description"),
+                "labels": voice.get("labels", {}),
+                "preview_url": voice.get("preview_url"),
+            }
+        )
+
+    prompt = {
+        "task": "Choose the best ElevenLabs voice for a translated ad voiceover. Match the original style, but do not clone or impersonate a real person.",
+        "target_language": language_name,
+        "original_voice_style": voice_style,
+        "candidates": compact_candidates,
+        "selection_rules": [
+            "Prefer voices that are native or clearly appropriate for the target language.",
+            "Match gender presentation, energy, pace, and commercial tone when possible.",
+            "Prefer a natural ad voice over an extreme character voice.",
+            "Return one voice_id from the candidates.",
+        ],
+        "return_schema": {"voice_id": "string", "reason": "short explanation"},
+    }
+    response = client.responses.create(
+        model=model,
+        input=[{"role": "user", "content": [{"type": "input_text", "text": json.dumps(prompt, ensure_ascii=False)}]}],
+        text={"format": {"type": "json_object"}},
+    )
+    selected = json.loads(response.output_text)
+    selected_id = selected["voice_id"]
+    valid_ids = {voice.get("voice_id") for voice in candidates}
+    if selected_id not in valid_ids:
+        return candidates[0]["voice_id"]
+    return selected_id
+
+
 def encode_frame(frame: Any, max_width: int = 640) -> str:
     height, width = frame.shape[:2]
     if width > max_width:
@@ -443,6 +548,8 @@ def main() -> None:
     extract_audio(args.video, source_audio)
     segments = transcribe_audio(client, source_audio, args.transcription_model)
     broll = analyze_broll(client, args.video, args.vision_model)
+    voice_style = analyze_voice_style(client, segments, broll, args.text_model)
+    available_voices = elevenlabs_voices(elevenlabs_key)
 
     if args.write_debug_files:
         (args.output_dir / "broll_analysis.json").write_text(json.dumps(broll, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -450,6 +557,7 @@ def main() -> None:
             json.dumps([asdict(segment) for segment in segments], indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        (args.output_dir / "original_voice_style.json").write_text(json.dumps(voice_style, indent=2, ensure_ascii=False), encoding="utf-8")
 
     for language_code in args.languages:
         if language_code not in languages:
@@ -457,7 +565,14 @@ def main() -> None:
         language = languages[language_code]
         voice_id = os.getenv(language["elevenlabs_voice_id_env"])
         if not voice_id:
-            raise RuntimeError(f"Missing {language['elevenlabs_voice_id_env']} for {language['name']}")
+            voice_id = choose_elevenlabs_voice(
+                client,
+                available_voices,
+                language_code,
+                language["name"],
+                voice_style,
+                args.text_model,
+            )
 
         translated = translate_segments(
             client,
@@ -484,7 +599,7 @@ def main() -> None:
         if args.write_debug_files:
             write_srt(generated, args.output_dir / f"{stem}_subtitles.srt")
             (args.output_dir / f"{stem}_script.json").write_text(
-                json.dumps(generated, indent=2, ensure_ascii=False),
+                json.dumps({"selected_voice_id": voice_id, "segments": generated}, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
 

@@ -9,7 +9,3 @@ services:
         sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
-      - key: ELEVENLABS_VOICE_ID_DE
-        sync: false
-      - key: ELEVENLABS_VOICE_ID_FR
-        sync: false
