@@ -543,12 +543,17 @@ def generate_timed_voice_segments(
     return generated
 
 
-def assemble_synced_audio(generated: list[dict[str, Any]], video_duration_ms: int) -> AudioSegment:
+def assemble_synced_audio(generated: list[dict[str, Any]], video_duration_ms: int, max_pause_ms: int) -> AudioSegment:
     bed = AudioSegment.silent(duration=video_duration_ms)
     ordered = sorted(generated, key=lambda item: float(item["start"]))
+    cursor_ms = 0
     for index, segment in enumerate(ordered):
         audio = AudioSegment.from_file(segment["audio_path"])
-        start_ms = int(float(segment["start"]) * 1000)
+        original_start_ms = int(float(segment["start"]) * 1000)
+        if original_start_ms - cursor_ms > max_pause_ms:
+            start_ms = cursor_ms + max_pause_ms
+        else:
+            start_ms = max(original_start_ms, cursor_ms)
         segment_end_ms = int(float(segment["end"]) * 1000)
         next_start_ms = int(float(ordered[index + 1]["start"]) * 1000) if index + 1 < len(ordered) else video_duration_ms
         hard_end_ms = min(segment_end_ms, max(start_ms + 250, next_start_ms - 80))
@@ -558,11 +563,12 @@ def assemble_synced_audio(generated: list[dict[str, Any]], video_duration_ms: in
             audio = audio._spawn(audio.raw_data, overrides={"frame_rate": int(audio.frame_rate * speed)}).set_frame_rate(audio.frame_rate)
             audio = audio[:available_ms]
         bed = bed.overlay(audio, position=start_ms)
+        cursor_ms = start_ms + len(audio)
     return bed
 
 
-def export_synced_voiceover(generated: list[dict[str, Any]], video_duration_ms: int, output_path: Path, output_format: str) -> None:
-    audio = assemble_synced_audio(generated, video_duration_ms)
+def export_synced_voiceover(generated: list[dict[str, Any]], video_duration_ms: int, output_path: Path, output_format: str, max_pause_ms: int) -> None:
+    audio = assemble_synced_audio(generated, video_duration_ms, max_pause_ms)
     export_kwargs: dict[str, Any] = {"format": output_format}
     if output_format == "mp3":
         export_kwargs["bitrate"] = "192k"
@@ -610,6 +616,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vision-model", default=os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini"))
     parser.add_argument("--max-attempts", type=int, default=int(os.getenv("MAX_TTS_ATTEMPTS", "3")))
     parser.add_argument("--timing-pad-ms", type=int, default=150)
+    parser.add_argument("--max-pause-ms", type=int, default=int(os.getenv("MAX_PAUSE_MS", "700")))
     parser.add_argument("--max-chars-per-second", type=float, default=13.0)
     parser.add_argument("--output-format", choices=["mp3", "wav"], default="mp3")
     parser.add_argument("--broll-frames", type=int, default=int(os.getenv("BROLL_FRAMES", "18")), help="0 skips vision analysis for lower cost.")
@@ -698,7 +705,7 @@ def main() -> None:
         )
 
         stem = f"{language_code}_{language['name'].lower()}"
-        export_synced_voiceover(generated, video_duration_ms, args.output_dir / f"{stem}_voiceover.{args.output_format}", args.output_format)
+        export_synced_voiceover(generated, video_duration_ms, args.output_dir / f"{stem}_voiceover.{args.output_format}", args.output_format, args.max_pause_ms)
         if args.write_debug_files:
             write_srt(generated, args.output_dir / f"{stem}_subtitles.srt")
             (args.output_dir / f"{stem}_script.json").write_text(

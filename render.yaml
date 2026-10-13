@@ -19,3 +19,5 @@ services:
         value: "18"
       - key: MAX_TTS_ATTEMPTS
         value: "3"
+      - key: MAX_PAUSE_MS
+        value: "700"

@@ -75,7 +75,17 @@ By default, the website uses quality mode:
 
 This is better when you want the voiceover to closely match what is happening in the B-roll. It costs more and takes longer than fast mode.
 
+Long pauses can happen when translated lines are shorter than the original English timing. The app now caps silence between generated chunks by default so the voiceover feels more natural while still staying on the ad timeline.
+
 The approved script box is recommended when localizing competitor ads. It prevents the automation from repeating the competitor product name from the original video transcript.
+
+Translation modes:
+
+```text
+B-roll Sync = best visual matching, more time and credits
+Tight Pacing = uses B-roll but reduces long pauses
+Fast/Cheap = skips B-roll analysis for lower cost
+```
 
 Supported default language codes:
 

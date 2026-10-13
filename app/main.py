@@ -62,7 +62,14 @@ def zip_outputs(job_id: str) -> Path:
     return zip_path
 
 
-def run_voiceover_job(job_id: str, video_path: Path, languages: list[str], script_path: Path | None, banned_terms: str) -> None:
+def run_voiceover_job(
+    job_id: str,
+    video_path: Path,
+    languages: list[str],
+    script_path: Path | None,
+    banned_terms: str,
+    translation_mode: str,
+) -> None:
     work_dir = job_dir(job_id) / "work"
     outputs_dir = job_dir(job_id) / "outputs"
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -83,6 +90,13 @@ def run_voiceover_job(job_id: str, video_path: Path, languages: list[str], scrip
         "--output-format",
         "mp3",
     ]
+    if translation_mode == "fast":
+        command.extend(["--broll-frames", "0", "--max-attempts", "1", "--max-pause-ms", "700", "--skip-regeneration"])
+    elif translation_mode == "tight":
+        command.extend(["--broll-frames", "18", "--max-attempts", "3", "--max-pause-ms", "350"])
+    else:
+        command.extend(["--broll-frames", "18", "--max-attempts", "3", "--max-pause-ms", "1200"])
+
     if script_path:
         command.extend(["--script-file", str(script_path)])
     if banned_terms.strip():
@@ -129,12 +143,15 @@ async def create_job(
     background_tasks: BackgroundTasks,
     video: UploadFile = File(...),
     languages: str = Form("de"),
+    translation_mode: str = Form("broll"),
     approved_script: str = Form(""),
     banned_terms: str = Form(""),
 ) -> JSONResponse:
     selected_languages = [item.strip().lower() for item in languages.replace(",", " ").split() if item.strip()]
     if not selected_languages:
         raise HTTPException(status_code=400, detail="Choose at least one language.")
+    if translation_mode not in {"fast", "broll", "tight"}:
+        raise HTTPException(status_code=400, detail="Choose a valid translation mode.")
 
     job_id = uuid.uuid4().hex
     directory = job_dir(job_id)
@@ -159,12 +176,13 @@ async def create_job(
             "message": "Upload received. Waiting to start...",
             "created_at": now_iso(),
             "languages": selected_languages,
+            "translation_mode": translation_mode,
             "source_filename": video.filename,
             "has_approved_script": bool(script_path),
             "banned_terms": banned_terms,
         },
     )
-    background_tasks.add_task(run_voiceover_job, job_id, video_path, selected_languages, script_path, banned_terms)
+    background_tasks.add_task(run_voiceover_job, job_id, video_path, selected_languages, script_path, banned_terms, translation_mode)
     return JSONResponse({"job_id": job_id, "status_url": f"/api/jobs/{job_id}"})
 
 

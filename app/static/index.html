@@ -36,6 +36,22 @@
             <input type="hidden" name="languages" id="languages" value="de" />
           </fieldset>
 
+          <fieldset class="mode-grid">
+            <legend>Translation mode</legend>
+            <label>
+              <input type="radio" name="translation_mode" value="broll" checked />
+              <span><strong>B-roll Sync</strong><small>Best visual matching, more time and credits</small></span>
+            </label>
+            <label>
+              <input type="radio" name="translation_mode" value="tight" />
+              <span><strong>Tight Pacing</strong><small>Less silence, still uses B-roll analysis</small></span>
+            </label>
+            <label>
+              <input type="radio" name="translation_mode" value="fast" />
+              <span><strong>Fast/Cheap</strong><small>Skips B-roll analysis, lower cost</small></span>
+            </label>
+          </fieldset>
+
           <label class="script-box">
             <span>Approved script</span>
             <textarea name="approved_script" rows="8" placeholder="Paste your clean script here. Use your client's product name and remove competitor claims or product names. The automation will adapt this to fit the original timing."></textarea>
@@ -68,7 +84,8 @@
       <aside class="notes">
         <h2>For editors</h2>
         <p>Paste the approved client script to prevent competitor names from appearing in the generated voiceover.</p>
-        <p>Use language codes like de, fr, es, it, pt, or nl. The downloaded MP3 files go into your video editor on the original ad timeline.</p>
+        <p>Use B-roll Sync when visual matching matters most. Use Tight Pacing when pauses feel too long.</p>
+        <p>The downloaded MP3 files go into your video editor on the original ad timeline.</p>
         <p>This tool creates voiceover audio only. Product clip replacement and overlay removal still happen manually.</p>
       </aside>
     </main>
