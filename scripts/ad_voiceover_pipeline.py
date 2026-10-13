@@ -202,6 +202,7 @@ def choose_elevenlabs_voice(
             "Match gender presentation, energy, pace, and commercial tone when possible.",
             "Prefer a natural ad voice over an extreme character voice.",
             "Return one voice_id from the candidates.",
+            "Return JSON only.",
         ],
         "return_schema": {"voice_id": "string", "reason": "short explanation"},
     }
