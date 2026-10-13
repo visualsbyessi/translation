@@ -66,14 +66,14 @@ ad.mp4
 
 The translation prompt is tuned for native-speaker German/French ad voiceover, not direct word-for-word translation.
 
-By default, the website uses a faster/cheaper mode:
+By default, the website uses quality mode:
 
-- skips B-roll vision analysis
-- merges short transcript pieces into fewer voiceover chunks
-- uses cheaper OpenAI text settings
-- avoids repeated regeneration unless you enable it
+- analyzes B-roll frames
+- adapts the approved script or transcript to match the visuals
+- regenerates lines that are too long when needed
+- prioritizes natural native-speaker delivery
 
-This is better for 3-5 minute videos.
+This is better when you want the voiceover to closely match what is happening in the B-roll. It costs more and takes longer than fast mode.
 
 The approved script box is recommended when localizing competitor ads. It prevents the automation from repeating the competitor product name from the original video transcript.
 

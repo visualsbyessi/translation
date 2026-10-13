@@ -16,6 +16,6 @@ services:
       - key: OPENAI_VISION_MODEL
         value: gpt-4o-mini
       - key: BROLL_FRAMES
-        value: "0"
+        value: "18"
       - key: MAX_TTS_ATTEMPTS
-        value: "1"
+        value: "3"

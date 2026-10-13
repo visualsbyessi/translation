@@ -418,6 +418,8 @@ def translate_segments(
             "Keep meaning and sales intent.",
             "The provided source text is the approved script. Use it as the source of truth.",
             "Do not restore competitor product names from the original ad transcript.",
+            "Use visual_context to decide how each line should be phrased near the matching B-roll.",
+            "If the approved script and B-roll timing conflict, keep the approved message but make the phrasing fit the visual moment.",
             "Adapt phrasing to sound native, not literal.",
             f"Write like a native {language_name} speaker recording a paid social ad.",
             "Prefer short natural phrases over word-for-word translation.",
@@ -606,16 +608,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transcription-model", default=os.getenv("OPENAI_TRANSCRIPTION_MODEL", "whisper-1"))
     parser.add_argument("--text-model", default=os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini"))
     parser.add_argument("--vision-model", default=os.getenv("OPENAI_VISION_MODEL", "gpt-4o-mini"))
-    parser.add_argument("--max-attempts", type=int, default=int(os.getenv("MAX_TTS_ATTEMPTS", "1")))
+    parser.add_argument("--max-attempts", type=int, default=int(os.getenv("MAX_TTS_ATTEMPTS", "3")))
     parser.add_argument("--timing-pad-ms", type=int, default=150)
     parser.add_argument("--max-chars-per-second", type=float, default=13.0)
     parser.add_argument("--output-format", choices=["mp3", "wav"], default="mp3")
-    parser.add_argument("--broll-frames", type=int, default=int(os.getenv("BROLL_FRAMES", "0")), help="0 skips vision analysis for lower cost.")
+    parser.add_argument("--broll-frames", type=int, default=int(os.getenv("BROLL_FRAMES", "18")), help="0 skips vision analysis for lower cost.")
     parser.add_argument("--merge-segment-seconds", type=float, default=float(os.getenv("MERGE_SEGMENT_SECONDS", "14")))
     parser.add_argument("--merge-segment-chars", type=int, default=int(os.getenv("MERGE_SEGMENT_CHARS", "280")))
     parser.add_argument("--script-file", type=Path)
     parser.add_argument("--banned-terms", default="")
-    parser.add_argument("--regenerate-long-segments", action="store_true", help="Regenerate long TTS segments. Slower and uses more ElevenLabs/OpenAI.")
+    parser.add_argument("--skip-regeneration", action="store_true", help="Skip regenerating long TTS segments.")
     parser.add_argument("--write-debug-files", action="store_true", help="Also export JSON/SRT files for troubleshooting.")
     return parser.parse_args()
 
@@ -692,7 +694,7 @@ def main() -> None:
             args.work_dir,
             args.max_attempts,
             args.timing_pad_ms,
-            args.regenerate_long_segments,
+            not args.skip_regeneration,
         )
 
         stem = f"{language_code}_{language['name'].lower()}"
