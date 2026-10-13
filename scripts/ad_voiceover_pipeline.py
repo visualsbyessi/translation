@@ -313,12 +313,27 @@ def visual_context_for_segment(segment: Segment, broll: dict[str, Any]) -> str:
     shots = broll.get("shots", [])
     matching = []
     for shot in shots:
-        timestamp = float(shot.get("timestamp", -1))
+        timestamp = parse_timestamp_value(shot.get("timestamp", -1))
         if segment.start - 1 <= timestamp <= segment.end + 1:
             matching.append(shot.get("description", ""))
     if matching:
         return " | ".join(x for x in matching if x)
     return broll.get("overall_visual_story", "")
+
+
+def parse_timestamp_value(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        value = value.strip()
+        if ":" in value:
+            parts = [float(part) for part in value.split(":")]
+            total = 0.0
+            for part in parts:
+                total = total * 60 + part
+            return total
+        return float(value)
+    return -1.0
 
 
 def translate_segments(
