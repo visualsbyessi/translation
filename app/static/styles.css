@@ -23,18 +23,15 @@ body {
 }
 
 .shell {
-  width: min(1120px, calc(100% - 32px));
+  width: min(860px, calc(100% - 32px));
   min-height: 100vh;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 24px;
+  display: block;
   align-items: center;
   padding: 32px 0;
 }
 
-.panel,
-.notes {
+.panel {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -43,10 +40,6 @@ body {
 
 .panel {
   padding: 28px;
-}
-
-.notes {
-  padding: 24px;
 }
 
 .topbar {
